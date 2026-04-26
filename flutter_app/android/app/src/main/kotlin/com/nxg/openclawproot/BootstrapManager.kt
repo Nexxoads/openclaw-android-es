@@ -64,8 +64,8 @@ class BootstrapManager(
         val binBashExists = File("$rootfsDir/bin/bash").exists()
         val nodeExists = File("$rootfsDir/usr/local/bin/node").exists()
         val openclawExists = File("$rootfsDir/usr/local/lib/node_modules/openclaw/package.json").exists()
-        val localtunnelExists =
-            File("$rootfsDir/usr/local/lib/node_modules/localtunnel/package.json").exists()
+        val cloudflaredExists =
+            File("$rootfsDir/usr/local/bin/cloudflared").exists()
         val bypassExists = File("$rootfsDir/root/.openclaw/bionic-bypass.js").exists()
 
         return mapOf(
@@ -73,7 +73,7 @@ class BootstrapManager(
             "binBashExists" to binBashExists,
             "nodeInstalled" to nodeExists,
             "openclawInstalled" to openclawExists,
-            "localtunnelInstalled" to localtunnelExists,
+            "cloudflaredInstalled" to cloudflaredExists,
             "bypassInstalled" to bypassExists,
             "rootfsPath" to rootfsDir,
             "complete" to (rootfsExists && binBashExists && bypassExists

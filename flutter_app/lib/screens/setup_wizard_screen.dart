@@ -73,7 +73,7 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> {
                   Text(
                     _started
                         ? 'Instalando el entorno. Puede tardar varios minutos.'
-                        : 'Se descargarán Ubuntu, Node.js y OpenClaw en un entorno autocontenido (incluye localtunnel).',
+                        : 'Se descargarán Ubuntu, Node.js, OpenClaw y cloudflared en un entorno autocontenido.',
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),

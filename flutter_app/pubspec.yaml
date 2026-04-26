@@ -1,5 +1,5 @@
 name: openclaw_es
-description: OpenClaw ES — Gateway de IA para Android en español, con acceso remoto (localtunnel).
+description: OpenClaw ES — Gateway de IA para Android en español, con acceso remoto (Cloudflare Tunnel).
 publish_to: 'none'
 version: 1.8.7+18
 

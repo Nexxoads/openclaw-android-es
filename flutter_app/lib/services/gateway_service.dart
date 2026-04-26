@@ -5,11 +5,13 @@ import 'package:http/http.dart' as http;
 import '../constants.dart';
 import '../models/gateway_state.dart';
 import 'native_bridge.dart';
+import 'openclaw_v2_config.dart';
 import 'preferences_service.dart';
 
 class GatewayService {
   Timer? _healthTimer;
   Timer? _initialDelayTimer;
+  Timer? _autoStartNetworkDelay;
   StreamSubscription? _logSubscription;
   final _stateController = StreamController<GatewayState>.broadcast();
   GatewayState _state = const GatewayState();
@@ -92,21 +94,50 @@ class GatewayService {
       _startHealthCheck();
     } else if (prefs.autoStartGateway) {
       _updateState(_state.copyWith(
-        logs: [..._state.logs, _ts('[INFO] Iniciando gateway automáticamente...')],
+        logs: [..._state.logs, _ts('[INFO] Auto-inicio en 3 s (esperando red de Android)...')],
       ));
-      await start();
+      _autoStartNetworkDelay?.cancel();
+      _autoStartNetworkDelay = Timer(const Duration(seconds: 3), () {
+        _autoStartNetworkDelay = null;
+        start();
+      });
     }
+  }
+
+  static String _humanizeConsoleLog(String log) {
+    if (log.contains('ECONNREFUSED')) {
+      return '$log — Conexión rechazada: el servicio aún no escucha en ese puerto o el gateway no está listo.';
+    }
+    if (log.contains('ENOTFOUND')) {
+      return '$log — No se resolvió el nombre de host (revisa DNS o la conexión).';
+    }
+    if (log.contains('ETIMEDOUT') ||
+        log.toLowerCase().contains('timed out') ||
+        log.toLowerCase().contains('timeout')) {
+      return '$log — Tiempo de espera agotado en la red.';
+    }
+    if (log.contains('certificate') || log.contains('SSL') || log.contains('TLS')) {
+      return '$log — Problema de certificado o cifrado SSL/TLS.';
+    }
+    if (log.contains('EADDRINUSE')) {
+      return '$log — El puerto ya está en uso; puede haber otra instancia del gateway.';
+    }
+    if (log.contains('Permission denied') || log.contains('EACCES')) {
+      return '$log — Permiso denegado al acceder a un recurso.';
+    }
+    return log;
   }
 
   void _subscribeLogs() {
     _logSubscription?.cancel();
     _logSubscription = NativeBridge.gatewayLogStream.listen((log) {
-      final logs = [..._state.logs, log];
+      final line = _humanizeConsoleLog(log);
+      final logs = [..._state.logs, line];
       if (logs.length > 500) {
         logs.removeRange(0, logs.length - 500);
       }
       String? dashboardUrl;
-      final cleanLog = _cleanForUrl(log);
+      final cleanLog = _cleanForUrl(line);
       final urlMatch = _tokenUrlRegex.firstMatch(cleanLog);
       if (urlMatch != null) {
         dashboardUrl = urlMatch.group(0);
@@ -329,6 +360,7 @@ fs.writeFileSync(p, JSON.stringify(c, null, 2));
           rootfsResolv.writeAsStringSync(resolvContent);
         }
       } catch (_) {}
+      await OpenClawV2Config.applySecurityAndDefaults();
       await _writeNodeAllowConfig();
       _startingAt = DateTime.now();
       await NativeBridge.startGateway();
@@ -369,6 +401,8 @@ fs.writeFileSync(p, JSON.stringify(c, null, 2));
 
   /// Cancel both the initial delay timer and periodic health timer.
   void _cancelAllTimers() {
+    _autoStartNetworkDelay?.cancel();
+    _autoStartNetworkDelay = null;
     _initialDelayTimer?.cancel();
     _initialDelayTimer = null;
     _healthTimer?.cancel();

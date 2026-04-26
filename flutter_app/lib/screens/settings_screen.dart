@@ -192,9 +192,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   leading: const Icon(Icons.cloud),
                 ),
                 ListTile(
-                  title: const Text('Localtunnel'),
-                  subtitle: Text(_status['localtunnelInstalled'] == true
-                      ? 'Instalado'
+                  title: const Text('Cloudflare tunnel'),
+                  subtitle: Text(_status['cloudflaredInstalled'] == true
+                      ? 'Instalado (acceso remoto)'
                       : 'No instalado'),
                   leading: const Icon(Icons.public),
                 ),
@@ -245,6 +245,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       builder: (_) => const SetupWizardScreen(),
                     ),
                   ),
+                ),
+                ListTile(
+                  title: const Text('Reiniciar entorno'),
+                  subtitle: const Text(
+                    'Limpia procesos y bloqueos del gateway y reinicia la app',
+                  ),
+                  leading: const Icon(Icons.restart_alt),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: _confirmRestartEnvironment,
                 ),
                 const Divider(),
                 _sectionHeader(theme, 'ACERCA DE'),
@@ -341,6 +350,40 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ],
             ),
     );
+  }
+
+  Future<void> _confirmRestartEnvironment() async {
+    final go = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Reiniciar entorno'),
+        content: const Text(
+          'Se limpiarán procesos Node, cloudflared y archivos de bloqueo del gateway, y la aplicación se reiniciará. '
+          'Úsalo si el arranque queda bloqueado.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Reiniciar'),
+          ),
+        ],
+      ),
+    );
+    if (go != true || !mounted) return;
+    try {
+      await NativeBridge.runGatewayPreFlightCleanup();
+      await NativeBridge.restartApplication();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('No se pudo completar el reinicio: $e')),
+        );
+      }
+    }
   }
 
   Future<String> _getSnapshotPath() async {

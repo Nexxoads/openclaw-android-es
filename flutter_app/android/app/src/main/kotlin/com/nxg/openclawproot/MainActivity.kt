@@ -590,25 +590,88 @@ class MainActivity : FlutterActivity() {
                     }.start()
                 }
                 "startLocalTunnel" -> {
-                    val port = call.argument<Int>("port") ?: 18789
                     Thread {
                         try {
-                            val url = processManager.startLocalTunnelAndAwaitUrl(port, 120_000L)
-                            runOnUiThread { result.success(url) }
+                            if (CloudflaredQuickTunnelService.isServiceRunning &&
+                                CloudflaredQuickTunnelService.publicTunnelUrl != null
+                            ) {
+                                runOnUiThread {
+                                    result.success(CloudflaredQuickTunnelService.publicTunnelUrl)
+                                }
+                                return@Thread
+                            }
+                            if (!CloudflaredQuickTunnelService.isServiceRunning) {
+                                CloudflaredQuickTunnelService.start(applicationContext)
+                            }
+                            val deadline = System.currentTimeMillis() + 120_000L
+                            while (System.currentTimeMillis() < deadline) {
+                                val u = CloudflaredQuickTunnelService.publicTunnelUrl
+                                if (u != null) {
+                                    runOnUiThread { result.success(u) }
+                                    return@Thread
+                                }
+                                if (!CloudflaredQuickTunnelService.isServiceRunning) {
+                                    runOnUiThread {
+                                        result.error(
+                                            "TUNNEL_ERROR",
+                                            "El servicio de túnel se detuvo antes de obtener la URL",
+                                            null
+                                        )
+                                    }
+                                    return@Thread
+                                }
+                                Thread.sleep(150)
+                            }
+                            CloudflaredQuickTunnelService.stop(applicationContext)
+                            runOnUiThread {
+                                result.error(
+                                    "TUNNEL_ERROR",
+                                    "Tiempo de espera al obtener la URL pública de Cloudflare",
+                                    null
+                                )
+                            }
                         } catch (e: Exception) {
                             runOnUiThread { result.error("TUNNEL_ERROR", e.message, null) }
                         }
                     }.start()
                 }
                 "stopLocalTunnel" -> {
-                    processManager.stopLocalTunnel()
+                    CloudflaredQuickTunnelService.stop(applicationContext)
                     result.success(true)
                 }
                 "getLocalTunnelUrl" -> {
-                    result.success(processManager.getLocalTunnelUrl())
+                    result.success(CloudflaredQuickTunnelService.publicTunnelUrl)
                 }
                 "isLocalTunnelRunning" -> {
-                    result.success(processManager.isLocalTunnelProcessAlive())
+                    result.success(CloudflaredQuickTunnelService.isServiceRunning)
+                }
+                "runGatewayPreFlightCleanup" -> {
+                    Thread {
+                        try {
+                            processManager.runGatewayPreFlightCleanup()
+                            runOnUiThread { result.success(true) }
+                        } catch (e: Exception) {
+                            runOnUiThread {
+                                result.error("CLEANUP_ERROR", e.message, null)
+                            }
+                        }
+                    }.start()
+                }
+                "restartApplication" -> {
+                    try {
+                        val launch = packageManager.getLaunchIntentForPackage(packageName)?.apply {
+                            addFlags(
+                                Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                            )
+                        }
+                        if (launch != null) {
+                            startActivity(launch)
+                            Runtime.getRuntime().exit(0)
+                        }
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.error("RESTART_ERROR", e.message, null)
+                    }
                 }
                 else -> {
                     result.notImplemented()

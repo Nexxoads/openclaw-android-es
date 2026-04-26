@@ -17,10 +17,10 @@ class ProcessManager(
     private val filesDir: String,
     private val nativeLibDir: String
 ) {
-    private val localTunnelLock = Any()
-    private var localTunnelProcess: Process? = null
-    @Volatile private var localTunnelUrl: String? = null
-    private var localTunnelDrainThread: Thread? = null
+    private val cloudflaredQuickTunnelLock = Any()
+    private var cloudflaredQuickTunnelProcess: Process? = null
+    @Volatile private var cloudflaredQuickTunnelUrl: String? = null
+    private var cloudflaredQuickTunnelDrainThread: Thread? = null
 
     private val rootfsDir get() = "$filesDir/rootfs/ubuntu"
     private val tmpDir get() = "$filesDir/tmp"
@@ -329,48 +329,65 @@ class ProcessManager(
         return pb.start()
     }
 
+    /**
+     * Limpieza obligatoria antes de arrancar el gateway: procesos zombie y archivos de bloqueo.
+     */
+    fun runGatewayPreFlightCleanup() {
+        val cmd = (
+            "pkill -9 node 2>/dev/null || true; " +
+                "pkill -9 cloudflared 2>/dev/null || true; " +
+                "pkill -9 lt 2>/dev/null || true; " +
+                "rm -rf /root/.openclaw/pids/* 2>/dev/null || true; " +
+                "rm -rf /tmp/openclaw/* 2>/dev/null || true; " +
+                "echo gateway_preflight_ok"
+            )
+        runInProotSync(cmd, timeoutSeconds = 120L)
+    }
+
     // ================================================================
-    // Localtunnel — long-lived process; URL parsed from stdout.
+    // Cloudflare quick tunnel (cloudflared) — URL *.trycloudflare.com
     // ================================================================
 
-    fun getLocalTunnelUrl(): String? = localTunnelUrl
+    fun getCloudflaredQuickTunnelUrl(): String? = cloudflaredQuickTunnelUrl
 
-    fun isLocalTunnelProcessAlive(): Boolean {
-        val p = localTunnelProcess
+    fun isCloudflaredQuickTunnelProcessAlive(): Boolean {
+        val p = cloudflaredQuickTunnelProcess
         return p != null && p.isAlive
     }
 
-    fun stopLocalTunnel() {
-        synchronized(localTunnelLock) {
-            localTunnelDrainThread?.interrupt()
+    fun stopCloudflaredQuickTunnel() {
+        synchronized(cloudflaredQuickTunnelLock) {
+            cloudflaredQuickTunnelDrainThread?.interrupt()
             try {
-                localTunnelDrainThread?.join(1500)
+                cloudflaredQuickTunnelDrainThread?.join(1500)
             } catch (_: Exception) {
             }
-            localTunnelDrainThread = null
+            cloudflaredQuickTunnelDrainThread = null
             try {
-                localTunnelProcess?.destroyForcibly()
+                cloudflaredQuickTunnelProcess?.destroyForcibly()
             } catch (_: Exception) {
             }
             try {
-                localTunnelProcess?.waitFor(3, TimeUnit.SECONDS)
+                cloudflaredQuickTunnelProcess?.waitFor(3, TimeUnit.SECONDS)
             } catch (_: Exception) {
             }
-            localTunnelProcess = null
-            localTunnelUrl = null
+            cloudflaredQuickTunnelProcess = null
+            cloudflaredQuickTunnelUrl = null
         }
     }
 
     /**
-     * Starts `lt` inside gateway-style proot, blocks until a public URL is seen or timeout.
-     * Keeps the process running; a daemon thread drains remaining stdout.
+     * Inicia `cloudflared tunnel --url http://127.0.0.1:18789` en proot (modo gateway).
+     * Bloquea hasta ver la URL pública o agotar el tiempo.
      */
-    fun startLocalTunnelAndAwaitUrl(port: Int, timeoutMs: Long): String {
-        synchronized(localTunnelLock) {
-            stopLocalTunnel()
-            localTunnelUrl = null
+    fun startCloudflaredQuickTunnelAndAwaitUrl(timeoutMs: Long): String {
+        synchronized(cloudflaredQuickTunnelLock) {
+            stopCloudflaredQuickTunnel()
+            cloudflaredQuickTunnelUrl = null
 
-            val cmd = buildGatewayCommand("lt --port $port")
+            val cmd = buildGatewayCommand(
+                "cloudflared tunnel --url http://127.0.0.1:18789"
+            )
             val env = prootEnv()
             val pb = ProcessBuilder(cmd)
             pb.environment().clear()
@@ -378,7 +395,7 @@ class ProcessManager(
             pb.redirectErrorStream(true)
 
             val process = pb.start()
-            localTunnelProcess = process
+            cloudflaredQuickTunnelProcess = process
 
             val reader = BufferedReader(InputStreamReader(process.inputStream, Charsets.UTF_8))
             val deadline = System.currentTimeMillis() + timeoutMs
@@ -392,7 +409,7 @@ class ProcessManager(
                         collected.appendLine(rest)
                     }
                     throw RuntimeException(
-                        "localtunnel terminó antes de mostrar la URL. Salida: " +
+                        "cloudflared terminó antes de mostrar la URL. Salida: " +
                             collected.toString().takeLast(2000)
                     )
                 }
@@ -404,21 +421,24 @@ class ProcessManager(
                 }
                 if (line != null) {
                     collected.appendLine(line)
-                    foundUrl = extractLocalTunnelUrl(line)
+                    foundUrl = extractTryCloudflareUrl(line)
+                    if (foundUrl == null) {
+                        foundUrl = extractTryCloudflareUrl(collected.toString())
+                    }
                 }
             }
 
             if (foundUrl == null) {
-                stopLocalTunnel()
+                stopCloudflaredQuickTunnel()
                 throw RuntimeException(
-                    "Tiempo de espera agotado al obtener la URL de localtunnel. " +
+                    "Tiempo de espera al obtener la URL de Cloudflare. " +
                         "Últimas líneas: " + collected.toString().takeLast(1500)
                 )
             }
 
-            localTunnelUrl = foundUrl
+            cloudflaredQuickTunnelUrl = foundUrl
 
-            localTunnelDrainThread = Thread {
+            cloudflaredQuickTunnelDrainThread = Thread {
                 try {
                     while (true) {
                         reader.readLine() ?: break
@@ -427,7 +447,7 @@ class ProcessManager(
                 }
             }.apply {
                 isDaemon = true
-                name = "openclaw-lt-drain"
+                name = "openclaw-cloudflared-drain"
                 start()
             }
 
@@ -435,15 +455,9 @@ class ProcessManager(
         }
     }
 
-    private fun extractLocalTunnelUrl(line: String): String? {
-        Regex("""https://[a-zA-Z0-9-]+\.loca\.lt/?""")
-            .find(line)?.value?.let { return it.trimEnd('/') }
-        if (line.contains("your url is:", ignoreCase = true) ||
-            line.contains("url is:", ignoreCase = true)
-        ) {
-            Regex("""https?://[^\s"'<>]+""")
-                .find(line)?.value?.let { return it.trimEnd('/') }
-        }
+    private fun extractTryCloudflareUrl(text: String): String? {
+        Regex("""https://[a-zA-Z0-9-]+\.trycloudflare\.com/?""")
+            .find(text)?.value?.let { return it.trimEnd('/') }
         return null
     }
 }

@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import '../constants.dart';
 import '../models/setup_state.dart';
 import 'native_bridge.dart';
+import 'openclaw_v2_config.dart';
 
 class BootstrapService {
   final Dio _dio = Dio();
@@ -245,18 +246,22 @@ class BootstrapService {
         message: 'OpenClaw instalado',
       ));
 
-      _updateSetupNotification('Instalando localtunnel (acceso remoto)...', progress: 97);
+      _updateSetupNotification('Instalando cloudflared (acceso remoto)...', progress: 97);
       onProgress(const SetupState(
         step: SetupStep.installingOpenClaw,
         progress: 1.0,
-        message: 'Instalando localtunnel...',
+        message: 'Instalando cloudflared...',
       ));
+      final arch = await NativeBridge.getArch();
+      final cfSuffix = AppConstants.cloudflaredLinuxSuffix(arch);
+      final cfUrl =
+          'https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-$cfSuffix';
       await NativeBridge.runInProot(
-        '$nodeRun $npmCli install -g localtunnel',
-        timeout: 900,
+        'curl -fsSL -o /usr/local/bin/cloudflared $cfUrl && chmod +x /usr/local/bin/cloudflared && cloudflared --version',
+        timeout: 300,
       );
-      await NativeBridge.createBinWrappers('localtunnel');
-      await NativeBridge.runInProot('command -v lt >/dev/null && lt --version || echo lt_ok');
+
+      await OpenClawV2Config.applySecurityAndDefaults();
 
       _updateSetupNotification('¡Configuración completada!', progress: 100);
       onProgress(const SetupState(

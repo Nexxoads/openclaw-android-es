@@ -209,4 +209,15 @@ class NativeBridge {
     final v = await _channel.invokeMethod<bool>('isLocalTunnelRunning');
     return v ?? false;
   }
+
+  /// Limpieza previa al gateway: pkill node/cloudflared/lt y archivos de bloqueo.
+  static Future<bool> runGatewayPreFlightCleanup() async {
+    final v = await _channel.invokeMethod<bool>('runGatewayPreFlightCleanup');
+    return v ?? false;
+  }
+
+  /// Reinicia la actividad principal y termina el proceso (rescate).
+  static Future<void> restartApplication() async {
+    await _channel.invokeMethod('restartApplication');
+  }
 }

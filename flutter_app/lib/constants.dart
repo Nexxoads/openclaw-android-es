@@ -63,6 +63,20 @@ class AppConstants {
   static const String channelName = 'com.openclaw.es/native';
   static const String eventChannelName = 'com.openclaw.es/gateway_logs';
 
+  /// Sufijo de binario cloudflared-linux-* (GitHub releases).
+  static String cloudflaredLinuxSuffix(String arch) {
+    switch (arch) {
+      case 'aarch64':
+        return 'arm64';
+      case 'arm':
+        return 'arm';
+      case 'x86_64':
+        return 'amd64';
+      default:
+        return 'arm64';
+    }
+  }
+
   static String getRootfsUrl(String arch) {
     switch (arch) {
       case 'aarch64':

@@ -129,7 +129,7 @@ class GatewayControls extends StatelessWidget {
                 const SizedBox(height: 16),
                 const Divider(),
                 const SizedBox(height: 12),
-                _LocalTunnelSection(gatewayRunning: state.isRunning),
+                _RemoteAccessSection(gatewayRunning: state.isRunning),
               ],
             ),
           ),
@@ -187,16 +187,16 @@ class GatewayControls extends StatelessWidget {
   }
 }
 
-class _LocalTunnelSection extends StatefulWidget {
+class _RemoteAccessSection extends StatefulWidget {
   final bool gatewayRunning;
 
-  const _LocalTunnelSection({required this.gatewayRunning});
+  const _RemoteAccessSection({required this.gatewayRunning});
 
   @override
-  State<_LocalTunnelSection> createState() => _LocalTunnelSectionState();
+  State<_RemoteAccessSection> createState() => _RemoteAccessSectionState();
 }
 
-class _LocalTunnelSectionState extends State<_LocalTunnelSection> {
+class _RemoteAccessSectionState extends State<_RemoteAccessSection> {
   bool _busy = false;
   String? _url;
   String? _error;
@@ -233,6 +233,16 @@ class _LocalTunnelSectionState extends State<_LocalTunnelSection> {
           SnackBar(content: Text('Acceso remoto activo: $url')),
         );
       }
+    } on PlatformException catch (e) {
+      if (!mounted) return;
+      final msg = e.message ?? e.code;
+      setState(() {
+        _busy = false;
+        _error = msg;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo iniciar el túnel Cloudflare: $msg')),
+      );
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -278,7 +288,7 @@ class _LocalTunnelSectionState extends State<_LocalTunnelSection> {
 
     if (!widget.gatewayRunning) {
       return Text(
-        'Inicia el gateway para habilitar el acceso remoto (localtunnel).',
+        'Inicia el gateway para habilitar el acceso remoto (Cloudflare Quick Tunnel).',
         style: theme.textTheme.bodySmall?.copyWith(
           color: theme.colorScheme.onSurfaceVariant,
         ),

@@ -144,6 +144,13 @@ class GatewayService : Service() {
                 val nativeLibDir = applicationContext.applicationInfo.nativeLibraryDir
                 val pm = ProcessManager(filesDir, nativeLibDir)
 
+                try {
+                    emitLog("[INFO] Limpieza previa al arranque (procesos y bloqueos)…")
+                    pm.runGatewayPreFlightCleanup()
+                } catch (e: Exception) {
+                    emitLog("[WARN] Limpieza previa incompleta: ${e.message}")
+                }
+
                 // Recreate all directories (config, tmp, home, lib, proc/sys fakes)
                 // in case Android cleared them after an app update (#40).
                 // This must run before proot — it needs bind-mount targets.
@@ -198,7 +205,7 @@ class GatewayService : Service() {
                 synchronized(lock) {
                     if (stopping) return@Thread
                     processStartTime = System.currentTimeMillis()
-                    gatewayProcess = pm.startProotProcess("openclaw gateway --verbose")
+                    gatewayProcess = pm.startProotProcess("openclaw gateway --verbose --no-watchdog")
                 }
                 updateNotificationRunning()
                 emitLog("[INFO] Gateway process spawned")

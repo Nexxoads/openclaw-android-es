@@ -163,18 +163,18 @@ class _SplashScreenState extends State<SplashScreen>
               } catch (_) {}
             }
 
-            final ltOk = status['localtunnelInstalled'] == true;
-            if (!ltOk && nodeOk) {
-              setState(() => _status = 'Instalando localtunnel...');
+            final cfOk = status['cloudflaredInstalled'] == true;
+            if (!cfOk && nodeOk) {
+              setState(() => _status = 'Instalando cloudflared...');
               try {
-                const wrapper = '/root/.openclaw/node-wrapper.js';
-                const nodeRun = 'node $wrapper';
-                const npmCli = '/usr/local/lib/node_modules/npm/bin/npm-cli.js';
+                final arch = await NativeBridge.getArch();
+                final cfSuffix = AppConstants.cloudflaredLinuxSuffix(arch);
+                final cfUrl =
+                    'https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-$cfSuffix';
                 await NativeBridge.runInProot(
-                  '$nodeRun $npmCli install -g localtunnel',
-                  timeout: 900,
+                  'curl -fsSL -o /usr/local/bin/cloudflared $cfUrl && chmod +x /usr/local/bin/cloudflared && cloudflared --version',
+                  timeout: 300,
                 );
-                await NativeBridge.createBinWrappers('localtunnel');
               } catch (_) {}
             }
 
