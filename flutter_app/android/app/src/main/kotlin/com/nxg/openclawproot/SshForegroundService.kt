@@ -23,7 +23,7 @@ import java.net.NetworkInterface
 class SshForegroundService : Service() {
     companion object {
         const val CHANNEL_ID = "openclaw_ssh"
-        const val NOTIFICATION_ID = 5
+        const val NOTIFICATION_ID = 7
         const val EXTRA_PORT = "port"
         var isRunning = false
             private set

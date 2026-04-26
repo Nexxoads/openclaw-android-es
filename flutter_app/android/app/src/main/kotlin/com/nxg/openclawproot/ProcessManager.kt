@@ -2,6 +2,7 @@ package com.nxg.openclawproot
 
 import android.os.Build
 import android.os.Environment
+import android.system.Os
 import java.io.BufferedReader
 import java.io.File
 import java.io.InputStreamReader
@@ -151,11 +152,8 @@ class ProcessManager(
                 val sdcardLink = File("$rootfsDir/sdcard")
                 if (!sdcardLink.exists()) {
                     try {
-                        Runtime.getRuntime().exec(
-                            arrayOf("ln", "-sf", "/storage/emulated/0", "$rootfsDir/sdcard")
-                        ).waitFor()
+                        Os.symlink("/storage/emulated/0", sdcardLink.absolutePath)
                     } catch (_: Exception) {
-                        // Fallback: create as directory if symlink fails
                         sdcardLink.mkdirs()
                     }
                 }

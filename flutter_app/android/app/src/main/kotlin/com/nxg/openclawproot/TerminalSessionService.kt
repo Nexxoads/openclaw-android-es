@@ -13,6 +13,7 @@ import android.os.PowerManager
 
 class TerminalSessionService : Service() {
     companion object {
+        const val CHANNEL_ID = "openclaw_terminal"
         const val NOTIFICATION_ID = 2
         var isRunning = false
             private set
@@ -77,11 +78,11 @@ class TerminalSessionService : Service() {
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
-                GatewayService.CHANNEL_ID,
-                "OpenClaw Gateway",
+                CHANNEL_ID,
+                "OpenClaw ES — Terminal",
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "Keeps the OpenClaw gateway running in the background"
+                description = "Mantiene la sesión de terminal activa en segundo plano"
             }
             val manager = getSystemService(NotificationManager::class.java)
             manager.createNotificationChannel(channel)
@@ -96,9 +97,9 @@ class TerminalSessionService : Service() {
         )
 
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            Notification.Builder(this, GatewayService.CHANNEL_ID)
+            Notification.Builder(this, CHANNEL_ID)
                 .setContentTitle("OpenClaw Terminal")
-                .setContentText("Terminal session active")
+                .setContentText("Sesión de terminal activa")
                 .setSmallIcon(android.R.drawable.ic_menu_manage)
                 .setContentIntent(pendingIntent)
                 .setOngoing(true)
@@ -107,7 +108,7 @@ class TerminalSessionService : Service() {
             @Suppress("DEPRECATION")
             Notification.Builder(this)
                 .setContentTitle("OpenClaw Terminal")
-                .setContentText("Terminal session active")
+                .setContentText("Sesión de terminal activa")
                 .setSmallIcon(android.R.drawable.ic_menu_manage)
                 .setContentIntent(pendingIntent)
                 .setOngoing(true)
