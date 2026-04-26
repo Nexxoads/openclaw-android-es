@@ -88,6 +88,7 @@ class GatewayService : Service() {
             return START_STICKY
         }
         stopping = false
+        restartCount = 0
         acquireWakeLock()
         startGateway()
         return START_STICKY
@@ -205,7 +206,7 @@ class GatewayService : Service() {
                 synchronized(lock) {
                     if (stopping) return@Thread
                     processStartTime = System.currentTimeMillis()
-                    gatewayProcess = pm.startProotProcess("openclaw gateway --verbose --no-watchdog")
+                    gatewayProcess = pm.startProotProcess("openclaw gateway --verbose")
                 }
                 updateNotificationRunning()
                 emitLog("[INFO] Gateway process spawned")
