@@ -172,7 +172,9 @@ class _SplashScreenState extends State<SplashScreen>
                 final cfUrl =
                     'https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-$cfSuffix';
                 await NativeBridge.runInProot(
-                  'curl -fsSL -o /usr/local/bin/cloudflared $cfUrl && chmod +x /usr/local/bin/cloudflared && cloudflared --version',
+                  '(curl -fsSL -o /usr/local/bin/cloudflared $cfUrl || '
+                  'wget -q -O /usr/local/bin/cloudflared $cfUrl) && '
+                  'chmod +x /usr/local/bin/cloudflared && cloudflared --version',
                   timeout: 300,
                 );
               } catch (_) {}

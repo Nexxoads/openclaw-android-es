@@ -26,6 +26,8 @@ class TerminalService {
 
     final filesDir = await _channel.invokeMethod<String>('getFilesDir') ?? '';
     final nativeLibDir = await _channel.invokeMethod<String>('getNativeLibDir') ?? '';
+    // Detect actual device architecture for the uname struct in proot
+    final arch = await NativeBridge.getArch();
 
     final rootfsDir = '$filesDir/rootfs/ubuntu';
     final tmpDir = '$filesDir/tmp';
@@ -71,6 +73,7 @@ class TerminalService {
       'PROOT_LOADER': '$nativeLibDir/libprootloader.so',
       'PROOT_LOADER_32': '$nativeLibDir/libprootloader32.so',
       'LD_LIBRARY_PATH': '$libDir:$nativeLibDir',
+      'arch': arch,
     };
   }
 
@@ -83,12 +86,9 @@ class TerminalService {
     final sysFakes = '${config['configDir']}/sys_fakes';
     final rootfsDir = config['rootfsDir']!;
 
-    // Detect architecture for uname struct
-    // flutter_pty runs on the same device, so we can use Dart's Platform
-    String machine = 'aarch64'; // default
-    try {
-      // Will be set by the caller if needed; for now default arm64
-    } catch (_) {}
+    // Map arch (from NativeBridge.getArch()) to uname -m format
+    final archRaw = config['arch'] ?? 'aarch64';
+    final machine = archRaw == 'arm' ? 'armv7l' : archRaw;
 
     // Full uname struct matching proot-distro command_login
     final kernelRelease = '\\Linux\\localhost\\$_fakeKernelRelease'
@@ -153,6 +153,9 @@ class TerminalService {
       'COLUMNS=$columns',
       'LINES=$rows',
       'NODE_OPTIONS=--require /root/.openclaw/bionic-bypass.js',
+      'CHOKIDAR_USEPOLLING=true',
+      'NODE_EXTRA_CA_CERTS=/etc/ssl/certs/ca-certificates.crt',
+      'UV_USE_IO_URING=0',
       '/bin/bash',
       '-l',
     ]);
