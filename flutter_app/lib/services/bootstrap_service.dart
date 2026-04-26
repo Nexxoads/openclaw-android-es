@@ -252,7 +252,6 @@ class BootstrapService {
         progress: 1.0,
         message: 'Instalando cloudflared...',
       ));
-      final arch = await NativeBridge.getArch();
       final cfSuffix = AppConstants.cloudflaredLinuxSuffix(arch);
       final cfUrl =
           'https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-$cfSuffix';
